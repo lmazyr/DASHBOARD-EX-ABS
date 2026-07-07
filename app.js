@@ -455,7 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     syncStatus.style.color = "#dc2626";
                 }
                 console.warn("⚠️ Nenhum link configurado");
-                return;
+                return Promise.reject("Sem link");
             }
 
             const container = document.querySelector(".refresh-container");
@@ -463,10 +463,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (syncStatus) {
                 syncStatus.textContent = "🔄 Sincronizando...";
-                container.classList.add("syncing");
+                if (container) container.classList.add("syncing");
             }
 
-            console.log("📥 Tentando baixar de:", link);
+            console.log("📥 Tentando baixar de:", link.substring(0, 50) + "...");
 
             const downloadUrl = converterLinkParaDownload(link);
 
@@ -487,11 +487,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!response || !response.ok) {
                 console.error("❌ Falha ao baixar do OneDrive");
                 
-                const syncStatus = document.getElementById("syncStatus");
                 if (syncStatus) {
                     syncStatus.textContent = "❌ Erro";
                     syncStatus.style.color = "#dc2626";
-                    container.classList.remove("syncing");
+                    if (container) container.classList.remove("syncing");
                 }
 
                 throw new Error("SharePoint retornou erro. Tente importar manualmente.");
@@ -501,11 +500,42 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = new Uint8Array(arrayBuffer);
             const workbook = XLSX.read(data, { type: "array" });
 
-            const planilha = workbook.Sheets[workbook.SheetNames[0]];
-            dadosOriginais = XLSX.utils.sheet_to_json(planilha, { defval: "" });
+            // Buscar a aba JUNHO
+            let nomeAba = "JUNHO";
+            if (!workbook.SheetNames.includes("JUNHO")) {
+                nomeAba = workbook.SheetNames.find(aba => aba !== "RESUMO");
+                if (!nomeAba) nomeAba = workbook.SheetNames[0];
+            }
+
+            const planilha = workbook.Sheets[nomeAba];
+            
+            // Ler os dados corretamente
+            const dados = XLSX.utils.sheet_to_json(planilha, { header: 1 });
+            
+            let linhaHeader = 0;
+            for (let i = 0; i < dados.length; i++) {
+                if (dados[i][0] === "TURNO") {
+                    linhaHeader = i;
+                    break;
+                }
+            }
+            
+            const headers = dados[linhaHeader];
+            dadosOriginais = [];
+            
+            for (let i = linhaHeader + 1; i < dados.length; i++) {
+                if (!dados[i][0]) continue;
+                
+                const obj = {};
+                headers.forEach((header, idx) => {
+                    obj[header] = dados[i][idx] || "";
+                });
+                dadosOriginais.push(obj);
+            }
+
             dadosFiltrados = [...dadosOriginais];
 
-            console.log("✅ Dados carregados:", dadosOriginais.length, "registros");
+            console.log("✅ Dados carregados:", dadosOriginais.length, "registros de", nomeAba);
 
             popularFuncoes();
             atualizarDashboard();
@@ -515,8 +545,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (syncStatus) {
                 syncStatus.textContent = `✅ ${agora}`;
                 syncStatus.style.color = "#16A34A";
-                container.classList.remove("syncing");
+                if (container) container.classList.remove("syncing");
             }
+            
+            return Promise.resolve();
 
         } catch (erro) {
             const syncStatus = document.getElementById("syncStatus");
@@ -525,10 +557,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (syncStatus) {
                 syncStatus.textContent = "❌ Offline";
                 syncStatus.style.color = "#dc2626";
-                container.classList.remove("syncing");
+                if (container) container.classList.remove("syncing");
             }
 
             console.error("❌ Erro de sincronização:", erro.message);
+            return Promise.reject(erro);
         }
     }
 
@@ -629,11 +662,22 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
 
     carregarLinkOneDrive();
-    popularFuncoes();
-    atualizarDashboard();
+    
+    // Tentar carregar dados do OneDrive automaticamente
+    console.log("📥 Tentando carregar arquivo do OneDrive...");
+    baixarDoOneDrive().then(() => {
+        // Se conseguir baixar, inicia o auto-refresh a cada 5 minutos
+        console.log("✅ Auto-refresh do OneDrive iniciado");
+        iniciarAutoRefresh();
+    }).catch(() => {
+        // Se não conseguir, espera o usuário importar manualmente
+        console.log("⚠️ Não foi possível carregar do OneDrive. Importe um arquivo Excel manualmente.");
+        popularFuncoes();
+        atualizarDashboard();
+    });
 
     console.log("✅ Dashboard carregado");
-    console.log("📋 Importe um arquivo Excel ou configure o link do OneDrive");
+    console.log("📋 Aguardando sincronização ou importação manual...");
 
 });
 
