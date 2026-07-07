@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Executivo - SESE Logística</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <aside class="sidebar" aria-label="Filtros do dashboard">
+        <div class="logo">
+            <img src="logo.png" alt="SESE">
+            <div>
+                <h2>SESE</h2>
+                <span>LOGÍSTICA</span>
+            </div>
+        </div>
+
+        <div class="menu">
+            <div class="filter-title">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Filtros Inteligentes</span>
+            </div>
+
+            <div class="input-group">
+                <label for="searchInput">
+                    <i class="fa-solid fa-user"></i>
+                    Buscar Colaborador
+                </label>
+                <input id="searchInput" type="search" placeholder="Digite um nome..." autocomplete="off">
+            </div>
+
+            <div class="input-group">
+                <label for="turnoFilter">
+                    <i class="fa-solid fa-users"></i>
+                    Turno
+                </label>
+                <select id="turnoFilter">
+                    <option value="">Todos</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="funcaoFilter">
+                    <i class="fa-solid fa-briefcase"></i>
+                    Função
+                </label>
+                <select id="funcaoFilter">
+                    <option value="">Todas</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="mesPrincipal">
+                    <i class="fa-solid fa-calendar"></i>
+                    Mês Principal
+                </label>
+                <select id="mesPrincipal"></select>
+            </div>
+
+            <div class="input-group">
+                <label for="mesComparacao">
+                    <i class="fa-solid fa-chart-column"></i>
+                    Comparar Com
+                </label>
+                <select id="mesComparacao">
+                    <option value="">Sem comparação</option>
+                </select>
+            </div>
+
+            <button class="btn-primary" id="btnFiltro" type="button">
+                <i class="fa-solid fa-filter"></i>
+                Aplicar Filtros
+            </button>
+
+            <div class="sync-section">
+                <div class="filter-title">
+                    <i class="fa-solid fa-cloud"></i>
+                    <span>Fonte dos Dados</span>
+                </div>
+
+                <small>O dashboard tenta ler automaticamente o Excel da pasta do projeto. Se estiver usando OneDrive, cole um link compartilhável abaixo.</small>
+
+                <input type="url" id="oneDriveLink" placeholder="Cole o link do OneDrive...">
+
+                <button class="btn-primary compact" id="btnSalvarLink" type="button">
+                    <i class="fa-solid fa-save"></i>
+                    Salvar Link
+                </button>
+
+                <div class="sync-hint">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Importação manual continua disponível no topo.</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header>
+            <div class="left-header">
+                <button class="toggle-sidebar" type="button" title="Menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+
+                <div>
+                    <h1>Dashboard Executivo</h1>
+                    <p>
+                        <i class="fa-solid fa-calendar-days"></i>
+                        Absenteísmo - SESE Logística - 2026
+                    </p>
+                </div>
+            </div>
+
+            <div class="actions">
+                <div class="refresh-container">
+                    <button class="icon-btn" id="btnAutoRefresh" type="button" title="Ativar atualização automática">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                    <div class="sync-status" id="syncStatus">Aguardando</div>
+                    <select id="refreshInterval" class="refresh-select" title="Intervalo de atualização">
+                        <option value="10000">10 segundos</option>
+                        <option value="30000" selected>30 segundos</option>
+                        <option value="60000">1 minuto</option>
+                        <option value="300000">5 minutos</option>
+                    </select>
+                </div>
+
+                <button class="icon-btn" id="btnUploadExcel" type="button" title="Importar Excel">
+                    <i class="fa-solid fa-file-excel"></i>
+                </button>
+                <input type="file" id="excelFile" accept=".xlsx,.xls" hidden>
+
+                <button class="icon-btn" id="btnExportarExcel" type="button" title="Exportar Excel">
+                    <i class="fa-solid fa-download"></i>
+                </button>
+
+                <button class="icon-btn" id="btnExportPdf" type="button" title="Exportar PDF">
+                    <i class="fa-solid fa-file-pdf"></i>
+                </button>
+
+                <button class="theme-btn" type="button" title="Modo escuro">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <section class="status-bar" aria-live="polite">
+            <div>
+                <strong id="dataSourceLabel">Fonte: aguardando dados</strong>
+                <span id="lastUpdateLabel">Última atualização: --</span>
+            </div>
+            <span id="activeSheetLabel">Aba: --</span>
+        </section>
+
+        <section class="cards" aria-label="Indicadores principais">
+            <div class="card blue">
+                <div>
+                    <h4>Funcionários</h4>
+                    <h2 id="kpiFuncionarios">0</h2>
+                </div>
+                <i class="fa-solid fa-users"></i>
+            </div>
+
+            <div class="card green">
+                <div>
+                    <h4>Presença</h4>
+                    <h2 id="kpiPresenca">0%</h2>
+                </div>
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+
+            <div class="card moss">
+                <div>
+                    <h4>Faltas Justificadas</h4>
+                    <h2 id="kpiFJ">0</h2>
+                </div>
+                <i class="fa-solid fa-file-circle-check"></i>
+            </div>
+
+            <div class="card red">
+                <div>
+                    <h4>Faltas Não Justificadas</h4>
+                    <h2 id="kpiFN">0</h2>
+                </div>
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+        </section>
+
+        <section class="compare-card">
+            <div>
+                <h3>Comparativo Mensal</h3>
+                <small>Compare desempenho entre dois meses</small>
+            </div>
+            <div id="comparativoMeses"></div>
+        </section>
+
+        <section class="charts-grid">
+            <div class="chart-card">
+                <div class="card-header">
+                    <h3>Absenteísmo por Dia</h3>
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div class="chart-container">
+                    <canvas id="linha"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="card-header">
+                    <h3>Distribuição das Ocorrências</h3>
+                    <i class="fa-solid fa-chart-pie"></i>
+                </div>
+                <div id="pizza"></div>
+            </div>
+
+            <div class="chart-card full">
+                <div class="card-header">
+                    <h3>Top 10 Colaboradores</h3>
+                    <i class="fa-solid fa-ranking-star"></i>
+                </div>
+                <div id="ranking"></div>
+            </div>
+        </section>
+
+        <section class="table-card">
+            <div class="card-header">
+                <div>
+                    <h3>Resumo de Colaboradores</h3>
+                    <small><span id="totalRegistros">0</span> registros encontrados</small>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Função</th>
+                            <th>Turno</th>
+                            <th>P</th>
+                            <th>BH</th>
+                            <th>FJ</th>
+                            <th>FN</th>
+                            <th>Atestado</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
