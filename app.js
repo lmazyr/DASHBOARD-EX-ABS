@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let refreshIntervalTime = 300000; // 5 minutos
 
     // Link do OneDrive
-    const ONEDRIVE_LINK = "https://scaniaazureservices-my.sharepoint.com/:x:/r/personal/lucas_martins_scania_com/Documents/DASHBORD%20%20AB/Absente%C3%ADsmo%20-Expedi%C3%A7%C3%A3o%20Junho%202026.xlsx?d=w3a62a05b344044cd951d2eb4cd9d4280&csf=1&web=1&e=8kEhEM";
+    const ONEDRIVE_LINK = "https://scaniaazureservices-my.sharepoint.com/:x:/r/personal/lucas_martins_scania_com/_layouts/15/Doc.aspx?sourcedoc=%7B3A62A05B-3440-44CD-951D-2EB4CD9D4280%7D&file=Absente%25u00edsmo%20-Expedi%25u00e7%25u00e3o%20Junho%202026.xlsx&openShare=true&fromShare=true&action=default&mobileredirect=true;
 
     // ==========================================
     // ELEMENTOS DO DOM
