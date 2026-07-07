@@ -422,6 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     syncStatus.textContent = "❌ Sem link";
                     syncStatus.style.color = "#dc2626";
                 }
+                console.warn("⚠️ Nenhum link configurado");
                 return;
             }
 
@@ -433,39 +434,46 @@ document.addEventListener("DOMContentLoaded", () => {
                 container.classList.add("syncing");
             }
 
-            console.log("📥 Baixando arquivo do OneDrive...");
+            console.log("📥 Tentando baixar de:", link);
 
             const downloadUrl = converterLinkParaDownload(link);
-            console.log("URL:", downloadUrl);
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-            const response = await fetch(downloadUrl, {
-                method: 'GET',
-                signal: controller.signal,
-                headers: { 'Cache-Control': 'no-cache' }
+            // Tenta com fetch direto
+            let response = await Promise.race([
+                fetch(downloadUrl, {
+                    method: 'GET',
+                    headers: { 'Cache-Control': 'no-cache' }
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), 15000)
+                )
+            ]).catch(err => {
+                console.warn("⚠️ Fetch direto falhou:", err.message);
+                return null;
             });
 
-            clearTimeout(timeoutId);
+            if (!response || !response.ok) {
+                console.error("❌ Falha ao baixar do OneDrive");
+                
+                const syncStatus = document.getElementById("syncStatus");
+                if (syncStatus) {
+                    syncStatus.textContent = "❌ Erro";
+                    syncStatus.style.color = "#dc2626";
+                    container.classList.remove("syncing");
+                }
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                throw new Error("SharePoint retornou erro. Tente importar manualmente.");
             }
 
             const arrayBuffer = await response.arrayBuffer();
-            console.log("Tamanho:", arrayBuffer.byteLength, "bytes");
-
             const data = new Uint8Array(arrayBuffer);
             const workbook = XLSX.read(data, { type: "array" });
-
-            console.log("Abas:", workbook.SheetNames);
 
             const planilha = workbook.Sheets[workbook.SheetNames[0]];
             dadosOriginais = XLSX.utils.sheet_to_json(planilha, { defval: "" });
             dadosFiltrados = [...dadosOriginais];
 
-            console.log("Dados:", dadosOriginais.length, "registros");
+            console.log("✅ Dados carregados:", dadosOriginais.length, "registros");
 
             popularFuncoes();
             atualizarDashboard();
@@ -478,15 +486,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 container.classList.remove("syncing");
             }
 
-            console.log(`✅ Sincronizado: ${dadosOriginais.length} colaboradores`);
-
         } catch (erro) {
             const syncStatus = document.getElementById("syncStatus");
+            const container = document.querySelector(".refresh-container");
+            
             if (syncStatus) {
-                syncStatus.textContent = "❌ Erro";
+                syncStatus.textContent = "❌ Offline";
                 syncStatus.style.color = "#dc2626";
+                container.classList.remove("syncing");
             }
-            console.error("❌ Erro:", erro.message);
+
+            console.error("❌ Erro de sincronização:", erro.message);
         }
     }
 
@@ -502,14 +512,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const icon = btnAutoRefresh.querySelector("i");
         icon.classList.add("rotating");
 
-        baixarDoOneDrive();
+        // Se tiver dados, inicia a sincronização
+        if (dadosOriginais.length > 0) {
+            baixarDoOneDrive();
+        } else {
+            console.log("💡 Importe um arquivo Excel primeiro");
+        }
 
         autoRefreshInterval = setInterval(() => {
             console.log("🔄 Atualizando...");
-            baixarDoOneDrive();
+            
+            // Tenta sincronizar com OneDrive
+            baixarDoOneDrive().catch(err => {
+                // Se falhar, apenas recarrega os dados atuais
+                if (dadosOriginais.length > 0) {
+                    atualizarDashboard();
+                    console.log("🔄 Dashboard recarregado (dados locais)");
+                }
+            });
         }, refreshIntervalTime);
 
-        console.log(`✅ Auto-refresh: ${refreshIntervalTime / 1000}s`);
+        console.log(`✅ Auto-refresh: ${refreshIntervalTime / 1000 / 60}min`);
     }
 
     function pararAutoRefresh() {
@@ -577,11 +600,8 @@ document.addEventListener("DOMContentLoaded", () => {
     popularFuncoes();
     atualizarDashboard();
 
-    // Inicia auto-refresh após 1 segundo
-    setTimeout(() => {
-        console.log("🚀 Iniciando sincronização automática...");
-        iniciarAutoRefresh();
-    }, 1000);
+    console.log("✅ Dashboard carregado");
+    console.log("📋 Importe um arquivo Excel ou configure o link do OneDrive");
 
 });
 
