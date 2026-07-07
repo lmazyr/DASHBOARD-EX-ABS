@@ -29,8 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let isAutoRefreshActive = false;
     let refreshIntervalTime = 30000;
 
-    const ONEDRIVE_URL = "https://scaniaazureservices-my.sharepoint.com/:x:/g/personal/lucas_martins_scania_com/IQBboGI6QDTNRJUdLrTNnUKAAXhfsDUEmnLnBmsrURk6FIc";
-
     // ==========================================
     // ELEMENTOS
     // ==========================================
@@ -48,6 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const btnAutoRefresh = document.getElementById("btnAutoRefresh");
     const refreshInterval = document.getElementById("refreshInterval");
+
+    const btnSalvarLink = document.getElementById("btnSalvarLink");
+    const oneDriveLink = document.getElementById("oneDriveLink");
 
     const themeBtn = document.querySelector(".theme-btn");
 
@@ -832,9 +833,83 @@ document.addEventListener("DOMContentLoaded", () => {
     // AUTO-REFRESH
     // ==========================================
 
+    function converterLinkParaDownload(link) {
+
+        if (!link) return null;
+
+        try {
+
+            const url = new URL(link);
+
+            url.searchParams.set('download', '1');
+
+            return url.toString();
+
+        } catch (e) {
+
+            return null;
+
+        }
+
+    }
+
+    function salvarLinkOneDrive() {
+
+        const link = oneDriveLink.value.trim();
+
+        if (!link) {
+
+            alert("⚠️ Cole um link válido do OneDrive");
+
+            return;
+
+        }
+
+        localStorage.setItem('oneDriveLink', link);
+
+        console.log("✅ Link do OneDrive salvo");
+
+        alert("✅ Link salvo com sucesso!\nAgora você pode usar a sincronização automática.");
+
+    }
+
+    function carregarLinkOneDrive() {
+
+        const link = localStorage.getItem('oneDriveLink');
+
+        if (link) {
+
+            oneDriveLink.value = link;
+
+            console.log("✅ Link carregado do armazenamento");
+
+        }
+
+    }
+
     async function baixarDoOneDrive() {
 
         try {
+
+            const link = localStorage.getItem('oneDriveLink');
+
+            if (!link) {
+
+                const syncStatus = document.getElementById("syncStatus");
+
+                if (syncStatus) {
+
+                    syncStatus.textContent = "❌ Sem link";
+
+                    syncStatus.style.color = "#dc2626";
+
+                }
+
+                console.error("❌ Link do OneDrive não configurado");
+
+                return;
+
+            }
 
             const container = document.querySelector(".refresh-container");
 
@@ -850,13 +925,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
             console.log("📥 Baixando arquivo do OneDrive...");
 
-            const downloadUrl = ONEDRIVE_URL.replace('/view?', '/download?');
+            const downloadUrl = converterLinkParaDownload(link);
 
-            const response = await fetch(downloadUrl);
+            console.log("URL de download:", downloadUrl);
+
+            const response = await fetch(downloadUrl, {
+
+                method: 'GET',
+
+                headers: {
+
+                    'Cache-Control': 'no-cache',
+
+                    'Pragma': 'no-cache'
+
+                }
+
+            });
+
+            console.log("Status da resposta:", response.status);
 
             if (!response.ok) {
 
-                throw new Error(`Erro ao baixar: ${response.status}`);
+                throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
 
             }
 
@@ -884,6 +975,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 syncStatus.textContent = `✅ ${agora}`;
 
+                syncStatus.style.color = "#16A34A";
+
                 container.classList.remove("syncing");
 
             }
@@ -896,13 +989,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (syncStatus) {
 
-                syncStatus.textContent = "❌ Erro ao sincronizar";
+                syncStatus.textContent = "❌ Erro";
 
                 syncStatus.style.color = "#dc2626";
 
             }
 
-            console.error("❌ Erro ao sincronizar com OneDrive:", erro);
+            console.error("❌ Erro ao sincronizar com OneDrive:", erro.message);
 
         }
 
@@ -1005,6 +1098,28 @@ document.addEventListener("DOMContentLoaded", () => {
         refreshInterval.addEventListener("change", mudarIntervalo);
 
     }
+
+    if (btnSalvarLink) {
+
+        btnSalvarLink.addEventListener("click", salvarLinkOneDrive);
+
+    }
+
+    if (oneDriveLink) {
+
+        oneDriveLink.addEventListener("keypress", (e) => {
+
+            if (e.key === "Enter") {
+
+                salvarLinkOneDrive();
+
+            }
+
+        });
+
+    }
+
+    carregarLinkOneDrive();
 
     
 

@@ -1006,8 +1006,26 @@ body.dark tbody tr:hover {
 }
 
 /* ==========================================
-   RESPONSIVO
+   SINCRONIZAÇÃO ONEDRIVE
 ========================================== */
+
+.sync-section {
+
+   display: flex;
+
+   flex-direction: column;
+
+   gap: 12px;
+
+   padding: 15px;
+
+   background: rgba(255, 255, 255, 0.08);
+
+   border-radius: 18px;
+
+   margin-top: 20px;
+
+}
 
 @media(max-width:1400px){
 
