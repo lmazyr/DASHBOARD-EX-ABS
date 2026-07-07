@@ -419,6 +419,15 @@ select{
 
 }
 
+select {
+    color: white;
+}
+
+select option {
+    color: #1F2937;
+    background: white;
+    padding: 10px;
+}
 
 input::placeholder{
 
