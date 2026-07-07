@@ -25,6 +25,12 @@ document.addEventListener("DOMContentLoaded", () => {
     let graficoPizza = null;
     let graficoRanking = null;
 
+    let autoRefreshInterval = null;
+    let isAutoRefreshActive = false;
+    let refreshIntervalTime = 30000;
+
+    const ONEDRIVE_URL = "https://scaniaazureservices-my.sharepoint.com/:x:/g/personal/lucas_martins_scania_com/IQBboGI6QDTNRJUdLrTNnUKAAXhfsDUEmnLnBmsrURk6FIc";
+
     // ==========================================
     // ELEMENTOS
     // ==========================================
@@ -39,6 +45,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const excelFile = document.getElementById("excelFile");
 
     const btnExportarExcel = document.getElementById("btnExportarExcel");
+
+    const btnAutoRefresh = document.getElementById("btnAutoRefresh");
+    const refreshInterval = document.getElementById("refreshInterval");
 
     const themeBtn = document.querySelector(".theme-btn");
 
@@ -359,67 +368,31 @@ document.addEventListener("DOMContentLoaded", () => {
     // EXPORTAR EXCEL
     // ==========================================
 
-    function carregarExcel(e) {
+    function exportarExcel() {
 
-    const file = e.target.files[0];
-    if (!file) return;
+        if (dadosFiltrados.length === 0) {
 
-    const reader = new FileReader();
+            alert("⚠️ Nenhum dado para exportar");
 
-    reader.onload = function (evt) {
-
-        const data = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(data, { type: "array" });
-
-        const sheet = wb.Sheets[wb.SheetNames[1]]; // JUNHO ou JULHO automaticamente
-
-        const rows = XLSX.utils.sheet_to_json(sheet, {
-            header: 1,
-            defval: ""
-        });
-
-        const inicioDados = 5; // sua planilha começa na linha 6
-
-        const lista = [];
-
-        for (let i = inicioDados; i < rows.length; i++) {
-
-            const r = rows[i];
-
-            const nome = r[2];
-
-            if (!nome) continue;
-
-            lista.push({
-
-                Turno: r[1]?.toString().trim(),
-                Nome: nome?.toString().trim(),
-                Função: r[3]?.toString().trim(),
-
-                P: Number(r[5] || 0),
-                BH: Number(r[6] || 0),
-                FN: Number(r[7] || 0),
-                FJ: Number(r[8] || 0),
-                Atestado: Number(r[9] || 0)
-
-            });
+            return;
 
         }
 
-        dadosOriginais = lista;
-        dadosFiltrados = [...lista];
+        const ws = XLSX.utils.json_to_sheet(dadosFiltrados);
 
-        popularFuncoes();
-        atualizarDashboard();
+        const wb = XLSX.utils.book_new();
 
-        console.log("DADOS CARREGADOS:", lista);
+        XLSX.utils.book_append_sheet(wb, ws, "Dashboard");
 
-        alert(`Importado com sucesso: ${lista.length} colaboradores`);
+        XLSX.writeFile(wb, "dashboard_sese.xlsx");
 
-    };
+    }
 
-    reader.readAsArrayBuffer(file);
-}
+    if (btnExportarExcel) {
+
+        btnExportarExcel.addEventListener("click", exportarExcel);
+
+    }
    
 
 
@@ -852,6 +825,184 @@ document.addEventListener("DOMContentLoaded", () => {
         // Futuramente:
         // Atualizar gráficos usando os dados
         // dos dois meses importados
+
+    }
+
+    // ==========================================
+    // AUTO-REFRESH
+    // ==========================================
+
+    async function baixarDoOneDrive() {
+
+        try {
+
+            const container = document.querySelector(".refresh-container");
+
+            const syncStatus = document.getElementById("syncStatus");
+
+            if (syncStatus) {
+
+                syncStatus.textContent = "🔄 Sincronizando...";
+
+                container.classList.add("syncing");
+
+            }
+
+            console.log("📥 Baixando arquivo do OneDrive...");
+
+            const downloadUrl = ONEDRIVE_URL.replace('/view?', '/download?');
+
+            const response = await fetch(downloadUrl);
+
+            if (!response.ok) {
+
+                throw new Error(`Erro ao baixar: ${response.status}`);
+
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+
+            const data = new Uint8Array(arrayBuffer);
+
+            const workbook = XLSX.read(data, { type: "array" });
+
+            const primeiraAba = workbook.SheetNames[0];
+
+            const planilha = workbook.Sheets[primeiraAba];
+
+            dadosOriginais = XLSX.utils.sheet_to_json(planilha);
+
+            dadosFiltrados = [...dadosOriginais];
+
+            popularFuncoes();
+
+            atualizarDashboard();
+
+            const agora = new Date().toLocaleTimeString("pt-BR");
+
+            if (syncStatus) {
+
+                syncStatus.textContent = `✅ ${agora}`;
+
+                container.classList.remove("syncing");
+
+            }
+
+            console.log(`✅ Arquivo sincronizado: ${dadosOriginais.length} colaboradores`);
+
+        } catch (erro) {
+
+            const syncStatus = document.getElementById("syncStatus");
+
+            if (syncStatus) {
+
+                syncStatus.textContent = "❌ Erro ao sincronizar";
+
+                syncStatus.style.color = "#dc2626";
+
+            }
+
+            console.error("❌ Erro ao sincronizar com OneDrive:", erro);
+
+        }
+
+    }
+
+    function iniciarAutoRefresh() {
+
+        isAutoRefreshActive = true;
+
+        btnAutoRefresh.classList.add("active");
+
+        const container = btnAutoRefresh.closest(".refresh-container");
+
+        if (container) container.classList.add("active");
+
+        btnAutoRefresh.title = "Desativar Auto-Atualização";
+
+        const icon = btnAutoRefresh.querySelector("i");
+
+        icon.classList.add("rotating");
+
+        baixarDoOneDrive();
+
+        autoRefreshInterval = setInterval(() => {
+
+            console.log("🔄 Sincronizando com OneDrive...");
+
+            baixarDoOneDrive();
+
+        }, refreshIntervalTime);
+
+        console.log(`✅ Auto-refresh ativado a cada ${refreshIntervalTime / 1000} segundos`);
+
+    }
+
+    function pararAutoRefresh() {
+
+        isAutoRefreshActive = false;
+
+        btnAutoRefresh.classList.remove("active");
+
+        const container = btnAutoRefresh.closest(".refresh-container");
+
+        if (container) container.classList.remove("active");
+
+        btnAutoRefresh.title = "Ativar Auto-Atualização";
+
+        const icon = btnAutoRefresh.querySelector("i");
+
+        icon.classList.remove("rotating");
+
+        if (autoRefreshInterval) {
+
+            clearInterval(autoRefreshInterval);
+
+            autoRefreshInterval = null;
+
+        }
+
+        console.log("⏹️ Auto-refresh desativado");
+
+    }
+
+    function mudarIntervalo() {
+
+        refreshIntervalTime = parseInt(refreshInterval.value);
+
+        if (isAutoRefreshActive) {
+
+            pararAutoRefresh();
+
+            iniciarAutoRefresh();
+
+            console.log(`✅ Intervalo alterado para ${refreshIntervalTime / 1000} segundos`);
+
+        }
+
+    }
+
+    if (btnAutoRefresh) {
+
+        btnAutoRefresh.addEventListener("click", () => {
+
+            if (isAutoRefreshActive) {
+
+                pararAutoRefresh();
+
+            } else {
+
+                iniciarAutoRefresh();
+
+            }
+
+        });
+
+    }
+
+    if (refreshInterval) {
+
+        refreshInterval.addEventListener("change", mudarIntervalo);
 
     }
 

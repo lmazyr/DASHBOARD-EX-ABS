@@ -240,6 +240,34 @@
 
             <div class="actions">
 
+                <!-- AUTO REFRESH -->
+
+                <div class="refresh-container">
+
+                    <button
+                        class="icon-btn"
+                        id="btnAutoRefresh"
+                        title="Ativar Auto-Atualização do OneDrive"
+                    >
+
+                        <i class="fa-solid fa-cloud"></i>
+
+                    </button>
+
+                    <div class="sync-status" id="syncStatus"></div>
+
+                    <select id="refreshInterval" class="refresh-select">
+
+                        <option value="10000">10 segundos</option>
+                        <option value="30000" selected>30 segundos</option>
+                        <option value="60000">1 minuto</option>
+                        <option value="300000">5 minutos</option>
+
+                    </select>
+
+                </div>
+
+
                 <!-- IMPORTAR EXCEL -->
 
                 <button
