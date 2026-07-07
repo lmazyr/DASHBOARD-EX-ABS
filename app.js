@@ -27,7 +27,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let autoRefreshInterval = null;
     let isAutoRefreshActive = false;
-    let refreshIntervalTime = 30000;
+    let refreshIntervalTime = 300000; // 5 minutos
+
+    // Link do OneDrive - será carregado automaticamente
+    const ONEDRIVE_LINK = "https://scaniaazureservices-my.sharepoint.com/:x:/r/personal/lucas_martins_scania_com/Documents/DASHBORD%20%20AB/Absente%C3%ADsmo%20-Expedi%C3%A7%C3%A3o%20Junho%202026.xlsx?d=w3a62a05b344044cd951d2eb4cd9d4280&csf=1&web=1&e=8kEhEM";
 
     // ==========================================
     // ELEMENTOS
@@ -839,13 +842,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
 
-            const url = new URL(link);
+            // Remove espaços e caracteres especiais
+            let urlLimpa = link.trim();
 
-            url.searchParams.set('download', '1');
+            // Se for um link de compartilhamento do SharePoint
+            if (urlLimpa.includes('sharepoint.com')) {
 
-            return url.toString();
+                // Adiciona download=1 se não tiver
+                if (!urlLimpa.includes('download=1')) {
+
+                    urlLimpa += (urlLimpa.includes('?') ? '&' : '?') + 'download=1';
+
+                }
+
+                return urlLimpa;
+
+            }
+
+            return urlLimpa;
 
         } catch (e) {
+
+            console.error("Erro ao converter link:", e);
 
             return null;
 
@@ -875,9 +893,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function carregarLinkOneDrive() {
 
-        const link = localStorage.getItem('oneDriveLink');
+        let link = localStorage.getItem('oneDriveLink');
 
-        if (link) {
+        // Se não tiver link salvo, usa o link padrão
+        if (!link) {
+
+            link = ONEDRIVE_LINK;
+
+            localStorage.setItem('oneDriveLink', link);
+
+        }
+
+        if (link && oneDriveLink) {
 
             oneDriveLink.value = link;
 
@@ -927,7 +954,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const downloadUrl = converterLinkParaDownload(link);
 
-            console.log("URL de download:", downloadUrl);
+            console.log("URL original:", link);
+
+            console.log("URL convertida:", downloadUrl);
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
 
             const response = await fetch(downloadUrl, {
 
@@ -937,13 +969,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     'Cache-Control': 'no-cache',
 
-                    'Pragma': 'no-cache'
+                    'Pragma': 'no-cache',
 
-                }
+                    'Accept': '*/*'
+
+                },
+
+                signal: controller.signal
 
             });
 
+            clearTimeout(timeoutId);
+
             console.log("Status da resposta:", response.status);
+
+            console.log("Content-Type:", response.headers.get('content-type'));
 
             if (!response.ok) {
 
@@ -953,9 +993,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const arrayBuffer = await response.arrayBuffer();
 
+            console.log("Tamanho do arquivo recebido:", arrayBuffer.byteLength, "bytes");
+
             const data = new Uint8Array(arrayBuffer);
 
             const workbook = XLSX.read(data, { type: "array" });
+
+            console.log("Abas da planilha:", workbook.SheetNames);
 
             const primeiraAba = workbook.SheetNames[0];
 
@@ -964,6 +1008,8 @@ document.addEventListener("DOMContentLoaded", () => {
             dadosOriginais = XLSX.utils.sheet_to_json(planilha);
 
             dadosFiltrados = [...dadosOriginais];
+
+            console.log("Dados carregados:", dadosOriginais.slice(0, 2));
 
             popularFuncoes();
 
@@ -995,7 +1041,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             }
 
-            console.error("❌ Erro ao sincronizar com OneDrive:", erro.message);
+            console.error("❌ Erro ao sincronizar com OneDrive:");
+
+            console.error("Nome do erro:", erro.name);
+
+            console.error("Mensagem:", erro.message);
+
+            console.error("Stack:", erro.stack);
 
         }
 
@@ -1126,6 +1178,19 @@ document.addEventListener("DOMContentLoaded", () => {
     popularFuncoes();
 
     atualizarDashboard();
+
+    // ==========================================
+    // INICIAR AUTO-REFRESH AUTOMATICAMENTE
+    // ==========================================
+
+    // Aguarda um segundo antes de iniciar
+    setTimeout(() => {
+
+        console.log("🚀 Iniciando sincronização automática com OneDrive...");
+
+        iniciarAutoRefresh();
+
+    }, 1000);
 
 });
 
