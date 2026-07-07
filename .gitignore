@@ -1,0 +1,13 @@
+# Local spreadsheets
+*.xlsx
+*.xls
+~$*.xlsx
+~$*.xls
+
+# Temporary files
+.DS_Store
+Thumbs.db
+
+# Empty/old project folders
+CSS/
+JS/
