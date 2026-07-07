@@ -107,16 +107,48 @@ document.addEventListener("DOMContentLoaded", () => {
         reader.onload = function (evento) {
             const data = new Uint8Array(evento.target.result);
             const workbook = XLSX.read(data, { type: "array" });
-            const primeiraAba = workbook.SheetNames[0];
-            const planilha = workbook.Sheets[primeiraAba];
-
-            dadosOriginais = XLSX.utils.sheet_to_json(planilha, { defval: "" });
+            
+            // Buscar a aba JUNHO ou a primeira aba com dados
+            let nomeAba = "JUNHO";
+            if (!workbook.SheetNames.includes("JUNHO")) {
+                nomeAba = workbook.SheetNames.find(aba => aba !== "RESUMO");
+                if (!nomeAba) nomeAba = workbook.SheetNames[0];
+            }
+            
+            const planilha = workbook.Sheets[nomeAba];
+            
+            // Ler os dados, pulando título e cabeçalho
+            const dados = XLSX.utils.sheet_to_json(planilha, { header: 1 });
+            
+            // Encontrar linha do cabeçalho (que é "TURNO", "NOME COMPLETO", etc)
+            let linhaHeader = 0;
+            for (let i = 0; i < dados.length; i++) {
+                if (dados[i][0] === "TURNO") {
+                    linhaHeader = i;
+                    break;
+                }
+            }
+            
+            // Extrair headers e dados
+            const headers = dados[linhaHeader];
+            dadosOriginais = [];
+            
+            for (let i = linhaHeader + 1; i < dados.length; i++) {
+                if (!dados[i][0]) continue; // Pular linhas vazias
+                
+                const obj = {};
+                headers.forEach((header, idx) => {
+                    obj[header] = dados[i][idx] || "";
+                });
+                dadosOriginais.push(obj);
+            }
+            
             dadosFiltrados = [...dadosOriginais];
 
             popularFuncoes();
             atualizarDashboard();
 
-            console.log("✅ Arquivo local carregado:", dadosOriginais.length, "registros");
+            console.log("✅ Arquivo carregado de:", nomeAba, "com", dadosOriginais.length, "registros");
         };
         reader.readAsArrayBuffer(arquivo);
     }
@@ -144,10 +176,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
 
     function popularFuncoes() {
-        const funcoes = [...new Set(dadosOriginais.map(x => x["Função"] || ""))];
+        const funcoes = [...new Set(dadosOriginais.map(x => x["FUNÇÃO"] || "").filter(Boolean))];
         funcaoFilter.innerHTML = '<option value="">Todas</option>';
         funcoes.forEach(funcao => {
-            if (funcao) funcaoFilter.innerHTML += `<option value="${funcao}">${funcao}</option>`;
+            funcaoFilter.innerHTML += `<option value="${funcao}">${funcao}</option>`;
         });
     }
 
@@ -163,9 +195,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const funcao = funcaoFilter.value;
 
         dadosFiltrados = dadosOriginais.filter(item => {
-            const nomeOk = !nome || (item["Nome"] && item["Nome"].toLowerCase().includes(nome));
-            const turnoOk = !turno || item["Turno"] === turno;
-            const funcaoOk = !funcao || item["Função"] === funcao;
+            const nomeOk = !nome || (item["NOME COMPLETO"] && item["NOME COMPLETO"].toLowerCase().includes(nome));
+            const turnoOk = !turno || item["TURNO"] === turno;
+            const funcaoOk = !funcao || item["FUNÇÃO"] === funcao;
             return nomeOk && turnoOk && funcaoOk;
         });
 
@@ -193,9 +225,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const totalFJ = dadosFiltrados.reduce((soma, item) => soma + Number(item["FJ"] || 0), 0);
         const totalFN = dadosFiltrados.reduce((soma, item) => soma + Number(item["FN"] || 0), 0);
-        const totalAtestado = dadosFiltrados.reduce((soma, item) => soma + Number(item["Atestado"] || 0), 0);
+        const totalA = dadosFiltrados.reduce((soma, item) => soma + Number(item["A"] || 0), 0);
 
-        const totalFaltas = totalFJ + totalFN + totalAtestado;
+        const totalFaltas = totalFJ + totalFN + totalA;
         const presenca = totalFuncionarios > 0
             ? ((totalFuncionarios - totalFaltas) / totalFuncionarios) * 100
             : 100;
@@ -217,12 +249,12 @@ document.addEventListener("DOMContentLoaded", () => {
         dadosFiltrados.forEach(item => {
             tbody.innerHTML += `
                 <tr>
-                    <td>${item["Nome"] || "-"}</td>
-                    <td>${item["Função"] || "-"}</td>
-                    <td>${item["Turno"] || "-"}</td>
+                    <td>${item["NOME COMPLETO"] || "-"}</td>
+                    <td>${item["FUNÇÃO"] || "-"}</td>
+                    <td>${item["TURNO"] || "-"}</td>
                     <td><span class="badge badge-warning">${item["FJ"] || 0}</span></td>
                     <td><span class="badge badge-danger">${item["FN"] || 0}</span></td>
-                    <td><span class="badge badge-success">${item["Atestado"] || 0}</span></td>
+                    <td><span class="badge badge-info">${item["A"] || 0}</span></td>
                 </tr>
             `;
         });
@@ -284,14 +316,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const totalFJ = dadosFiltrados.reduce((soma, item) => soma + Number(item["FJ"] || 0), 0);
         const totalFN = dadosFiltrados.reduce((soma, item) => soma + Number(item["FN"] || 0), 0);
-        const totalAtestado = dadosFiltrados.reduce((soma, item) => soma + Number(item["Atestado"] || 0), 0);
-        const total = totalFJ + totalFN + totalAtestado;
+        const totalA = dadosFiltrados.reduce((soma, item) => soma + Number(item["A"] || 0), 0);
+        const total = totalFJ + totalFN + totalA;
 
         graficoPizza = new ApexCharts(container, {
             chart: { type: "donut", height: 350, toolbar: { show: false } },
-            series: [totalFJ, totalFN, totalAtestado],
-            labels: ["FJ", "FN", "Atestado"],
-            colors: [COLORS.warning, COLORS.danger, COLORS.success],
+            series: [totalFJ, totalFN, totalA],
+            labels: ["Feriado Judaico", "Feriado Nacional", "Ausência"],
+            colors: [COLORS.warning, COLORS.danger, COLORS.primary],
             legend: { position: "bottom", fontFamily: "Inter" },
             plotOptions: {
                 pie: {
@@ -319,8 +351,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const rankingDados = [...dadosFiltrados]
             .sort((a, b) => {
-                const totalA = Number(a.FJ || 0) + Number(a.FN || 0);
-                const totalB = Number(b.FJ || 0) + Number(b.FN || 0);
+                const totalA = Number(a.FJ || 0) + Number(a.FN || 0) + Number(a.A || 0);
+                const totalB = Number(b.FJ || 0) + Number(b.FN || 0) + Number(b.A || 0);
                 return totalB - totalA;
             })
             .slice(0, 10);
@@ -333,10 +365,10 @@ document.addEventListener("DOMContentLoaded", () => {
             colors: ["#4D7C0F", "#5B8C14", "#6B9E1C", "#7CB342", "#8BC34A", "#9CCC65", "#AED581", "#C5E1A5", "#DCE775", "#E6EE9C"],
             series: [{
                 name: "Faltas",
-                data: rankingDados.map(item => Number(item.FJ || 0) + Number(item.FN || 0))
+                data: rankingDados.map(item => Number(item.FJ || 0) + Number(item.FN || 0) + Number(item.A || 0))
             }],
             xaxis: {
-                categories: rankingDados.map(item => item.Nome)
+                categories: rankingDados.map(item => item["NOME COMPLETO"])
             },
             legend: { show: false },
             grid: { borderColor: "#E5E7EB" }
